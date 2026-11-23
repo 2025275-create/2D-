@@ -4,17 +4,529 @@
 <meta charset="utf-8">
 <title>ASTRALIA ― 天環の彼方 ―</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="ASTRALIA ― 天環の彼方 ― 起動ページ">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ASTRALIA">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#070b1c">
-<link rel="stylesheet" href="style.css">
+<meta name="theme-color" content="#050914">
+<meta name="format-detection" content="telephone=no">
+
+<!-- ================================================================
+     [CSS] 分離する場合は、このブロックの中身を style.css に移し、
+     <link rel="stylesheet" href="style.css"> に置き換えてください。
+     ================================================================ -->
+<style id="astralia-style">
+:root {
+  --navy-950: #03060f;
+  --navy-900: #050914;
+  --navy-800: #0a1230;
+  --navy-700: #101c46;
+  --silver-100: #f2f6fc;
+  --silver-300: #c9d3e3;
+  --silver-500: #8d9ab3;
+  --glow: #9fd8ff;
+  --glow-soft: rgba(159, 216, 255, 0.35);
+  --glow-faint: rgba(159, 216, 255, 0.12);
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+
+  --font-serif: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", "YuMincho", "Noto Serif JP", "Times New Roman", serif;
+  --font-sans: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--navy-900);
+  color: var(--silver-300);
+  font-family: var(--font-serif);
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+/* ---------- ステージ（ゲーム全体の表示領域） ---------- */
+#stage {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 38%, var(--navy-700) 0%, transparent 70%),
+    linear-gradient(180deg, var(--navy-800) 0%, var(--navy-950) 100%);
+}
+
+/* 将来のCanvas 2Dゲーム本体はこの #game に描画する（タイトル背景演出も兼用） */
+#game {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  outline: none;
+}
+
+/* ---------- UIレイヤー（Canvasの上に重ねるDOM UI） ---------- */
+#ui {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+  pointer-events: none;
+}
+
+.screen {
+  display: none;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(20px, 6vh, 64px);
+  padding: 2vh 4vw;
+}
+.screen.is-active { display: flex; }
+
+/* ---------- タイトル ---------- */
+.title { text-align: center; margin: 0; line-height: 1; }
+
+.title__main {
+  display: block;
+  font-weight: 600;
+  font-size: clamp(44px, 13vmin, 136px);
+  letter-spacing: 0.22em;
+  padding-left: 0.22em; /* 字間による視覚的な右寄りを補正 */
+  background: linear-gradient(180deg, #ffffff 0%, var(--silver-300) 48%, #7f8da8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: drop-shadow(0 0 18px var(--glow-soft)) drop-shadow(0 0 2px rgba(255, 255, 255, 0.45));
+}
+
+.title__sub {
+  display: block;
+  margin-top: clamp(10px, 2.4vh, 26px);
+  font-weight: 400;
+  font-size: clamp(16px, 3.6vmin, 34px);
+  letter-spacing: 0.4em;
+  padding-left: 0.4em;
+  color: var(--glow);
+  text-shadow: 0 0 14px var(--glow-soft);
+}
+
+/* ---------- メニューボタン ---------- */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 2.2vh, 20px);
+  width: min(78vw, 360px);
+  pointer-events: auto;
+}
+
+.btn {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 56px;
+  padding: 0.7em 1em;
+  font-family: var(--font-sans);
+  font-size: clamp(16px, 2.8vmin, 22px);
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-indent: 0.28em;
+  color: var(--silver-100);
+  background: linear-gradient(180deg, rgba(159, 216, 255, 0.10), rgba(16, 28, 70, 0.55));
+  border: 1px solid var(--silver-500);
+  border-radius: 2px;
+  cursor: pointer;
+  box-shadow: inset 0 0 18px var(--glow-faint), 0 0 0 rgba(159, 216, 255, 0);
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.12s, background 0.18s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 角飾り */
+.btn::before, .btn::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--glow);
+  opacity: 0.8;
+  pointer-events: none;
+}
+.btn::before { top: -4px; left: -4px; border-right: 0; border-bottom: 0; }
+.btn::after  { bottom: -4px; right: -4px; border-left: 0; border-top: 0; }
+
+.btn:hover,
+.btn:focus-visible {
+  border-color: var(--glow);
+  box-shadow: inset 0 0 22px var(--glow-soft), 0 0 22px var(--glow-faint);
+  outline: none;
+}
+.btn:active {
+  transform: scale(0.97);
+  border-color: #ffffff;
+  background: linear-gradient(180deg, rgba(159, 216, 255, 0.28), rgba(16, 28, 70, 0.7));
+  box-shadow: inset 0 0 26px var(--glow-soft), 0 0 30px var(--glow-soft);
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  color: var(--silver-500);
+  border-color: rgba(141, 154, 179, 0.35);
+  background: rgba(10, 18, 48, 0.35);
+  box-shadow: none;
+  cursor: default;
+  opacity: 0.55;
+}
+.btn:disabled::before, .btn:disabled::after { opacity: 0.25; }
+
+/* ---------- 仮実装メッセージ ---------- */
+#toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-b) + 6vh);
+  transform: translate(-50%, 12px);
+  max-width: 86vw;
+  padding: 0.7em 1.6em;
+  font-family: var(--font-sans);
+  font-size: clamp(14px, 2.4vmin, 18px);
+  letter-spacing: 0.12em;
+  text-align: center;
+  color: var(--silver-100);
+  background: rgba(5, 9, 20, 0.88);
+  border: 1px solid var(--glow-soft);
+  box-shadow: 0 0 24px var(--glow-faint);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+}
+#toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- フッター表記 ---------- */
+.version {
+  position: absolute;
+  right: calc(var(--safe-r) + 14px);
+  bottom: calc(var(--safe-b) + 8px);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--silver-500);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* ---------- 縦画面ガイド ---------- */
+#rotate-hint {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  padding: calc(var(--safe-t) + 24px) calc(var(--safe-r) + 24px) calc(var(--safe-b) + 24px) calc(var(--safe-l) + 24px);
+  text-align: center;
+  background: rgba(3, 6, 15, 0.94);
+  color: var(--silver-100);
+  font-size: clamp(18px, 4.4vw, 26px);
+  letter-spacing: 0.14em;
+  line-height: 1.8;
+}
+#rotate-hint small { font-family: var(--font-sans); font-size: 0.6em; color: var(--silver-500); letter-spacing: 0.1em; }
+@media (orientation: portrait) {
+  #rotate-hint { display: flex; }
+}
+
+/* ---------- 低い画面（スマホ横向き等）への調整 ---------- */
+@media (max-height: 430px) {
+  .screen { gap: 14px; }
+  .menu { flex-direction: row; width: min(92vw, 720px); }
+  .btn { min-height: 48px; letter-spacing: 0.16em; text-indent: 0.16em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
 </head>
+
 <body>
-<main id="stage">
-  <canvas id="game" aria-label="ASTRALIA ゲーム画面"></canvas>
-</main>
-<noscript><p class="msg">JavaScriptを有効にしてください。</p></noscript>
-<script type="module" src="src/core/main.js"></script>
+<!-- ================================================================
+     [HTML] ゲーム表示ツリー
+       #stage … 全体
+       #game  … Canvas 2D（将来のゲーム本体の描画先）
+       #ui    … DOMオーバーレイ（画面ごとに .screen を追加していく）
+     ================================================================ -->
+<div id="stage">
+  <canvas id="game" aria-hidden="true"></canvas>
+
+  <div id="ui">
+    <section id="screen-title" class="screen is-active" aria-labelledby="game-title">
+      <h1 class="title" id="game-title">
+        <span class="title__main">ASTRALIA</span>
+        <span class="title__sub">― 天環の彼方 ―</span>
+      </h1>
+
+      <nav class="menu" aria-label="メインメニュー">
+        <button type="button" class="btn" data-command="new-game">NEW GAME</button>
+        <button type="button" class="btn" data-command="continue">CONTINUE</button>
+        <button type="button" class="btn" data-command="settings">SETTINGS</button>
+      </nav>
+    </section>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div class="version" aria-hidden="true">v0.0.1 prototype</div>
+
+  <div id="rotate-hint" role="alert">
+    <div>端末を横向きにしてください</div>
+    <small>ASTRALIA は横画面でプレイします</small>
+  </div>
+</div>
+
+<noscript>
+  <p style="position:fixed;inset:0;display:grid;place-items:center;margin:0;background:#050914;color:#c9d3e3;font-family:sans-serif;">
+    JavaScriptを有効にしてください。
+  </p>
+</noscript>
+
+<!-- ================================================================
+     [JS] 分離する場合は、このブロックの中身を src/main.js などに移し、
+     <script type="module" src="src/main.js"></script> に置き換えてください。
+     ================================================================ -->
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- 設定 ---------- */
+  var SAVE_KEY = "astralia.save.v1";
+
+  /* ---------- ユーティリティ ---------- */
+  function storageGet(key) {
+    try { return window.localStorage.getItem(key); } catch (e) { return null; }
+  }
+
+  /* ---------- ゲーム本体との接続口 ----------
+     将来のCanvasゲーム本体は window.Astralia を通じて
+     UIコマンド（new-game / continue / settings）を受け取る。
+     登録がなければ仮実装のメッセージを表示する。 */
+  var Astralia = {
+    version: "0.0.1",
+    canvas: document.getElementById("game"),
+    ui: document.getElementById("ui"),
+    handlers: {},
+    on: function (command, fn) { this.handlers[command] = fn; },
+    emit: function (command) {
+      if (typeof this.handlers[command] === "function") {
+        this.handlers[command]();
+      } else {
+        showToast(PLACEHOLDER_TEXT[command] || "準備中です");
+      }
+      document.dispatchEvent(new CustomEvent("astralia:command", { detail: { command: command } }));
+    },
+    hasSave: function () { return !!storageGet(SAVE_KEY); },
+    showScreen: function (id) {
+      var screens = this.ui.querySelectorAll(".screen");
+      for (var i = 0; i < screens.length; i++) {
+        screens[i].classList.toggle("is-active", screens[i].id === id);
+      }
+    }
+  };
+  window.Astralia = Astralia;
+
+  var PLACEHOLDER_TEXT = {
+    "new-game": "NEW GAME ― 準備中です",
+    "continue": "CONTINUE ― 準備中です",
+    "settings": "SETTINGS ― 準備中です"
+  };
+
+  /* ---------- トースト ---------- */
+  var toastEl = document.getElementById("toast");
+  var toastTimer = 0;
+  function showToast(text) {
+    toastEl.textContent = text;
+    toastEl.classList.add("is-visible");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("is-visible"); }, 1800);
+  }
+
+  /* ---------- ボタン ---------- */
+  var continueBtn = document.querySelector('[data-command="continue"]');
+  function refreshContinue() {
+    var enabled = Astralia.hasSave();
+    continueBtn.disabled = !enabled;
+    continueBtn.setAttribute("aria-disabled", String(!enabled));
+  }
+  refreshContinue();
+
+  Astralia.ui.addEventListener("click", function (e) {
+    var btn = e.target.closest ? e.target.closest("[data-command]") : null;
+    if (!btn || btn.disabled) return;
+    Astralia.emit(btn.getAttribute("data-command"));
+  });
+
+  /* ---------- iPad Safari: ズーム・スクロール抑止 ---------- */
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); });
+  });
+  document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  var lastTouchEnd = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault(); // ダブルタップズーム防止
+    lastTouchEnd = now;
+  }, { passive: false });
+
+  /* ---------- Canvas：タイトル背景（星と天環）----------
+     将来はこの描画ループをゲーム本体に差し替える。 */
+  var canvas = Astralia.canvas;
+  var ctx = canvas.getContext("2d", { alpha: false });
+  var W = 1, H = 1, dpr = 1;
+  var stars = [];
+  var time = 0;
+  var last = 0;
+  var raf = 0;
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function makeStars() {
+    stars = [];
+    var count = Math.round(Math.min(160, Math.max(60, (W * H) / 9000)));
+    for (var i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random(), y: Math.random(),
+        r: 0.4 + Math.random() * 1.4,
+        speed: 0.4 + Math.random() * 1.6,
+        phase: Math.random() * Math.PI * 2,
+        blue: Math.random() < 0.45
+      });
+    }
+  }
+
+  function resize() {
+    var rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(1, Math.round(rect.width));
+    H = Math.max(1, Math.round(rect.height));
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    makeStars();
+    draw();
+  }
+
+  function drawRing(cx, cy, rx, ry, tilt, width, alpha, rot) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(tilt);
+    var g = ctx.createLinearGradient(-rx, 0, rx, 0);
+    g.addColorStop(0, "rgba(159,216,255,0)");
+    g.addColorStop(0.5 + 0.5 * Math.sin(rot), "rgba(242,246,252," + alpha + ")");
+    g.addColorStop(1, "rgba(159,216,255,0)");
+    ctx.strokeStyle = g;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    var bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#0a1230");
+    bg.addColorStop(1, "#03060f");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // 中央のやわらかな青白い光
+    var cx = W / 2, cy = H * 0.4;
+    var glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.55);
+    glow.addColorStop(0, "rgba(159,216,255,0.20)");
+    glow.addColorStop(0.45, "rgba(40,70,150,0.12)");
+    glow.addColorStop(1, "rgba(3,6,15,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+
+    // 天環
+    var base = Math.min(W, H * 1.6);
+    drawRing(cx, cy, base * 0.46, base * 0.11, -0.2, 1.6, 0.85, time * 0.5);
+    drawRing(cx, cy, base * 0.56, base * 0.14, -0.2, 1, 0.45, time * 0.35 + 2);
+    drawRing(cx, cy, base * 0.66, base * 0.17, -0.2, 0.8, 0.25, time * 0.25 + 4);
+
+    // 星
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var tw = 0.5 + 0.5 * Math.sin(time * s.speed + s.phase);
+      var y = ((s.y * H) - time * 3 * s.r + H) % H; // ゆっくり上昇
+      ctx.globalAlpha = 0.2 + 0.7 * tw;
+      ctx.fillStyle = s.blue ? "#9fd8ff" : "#e6edf8";
+      ctx.beginPath();
+      ctx.arc(s.x * W, y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function frame(now) {
+    raf = requestAnimationFrame(frame);
+    if (!last) { last = now; return; }
+    var dt = Math.min((now - last) / 1000, 0.1); // フレーム落ち時の時間補正
+    last = now;
+    if (!reduceMotion) time += dt;               // 時間管理はdeltaTimeで行い、端末FPSに依存させない
+    draw();
+  }
+
+  function start() {
+    if (raf) return;
+    last = 0;
+    raf = requestAnimationFrame(frame);
+  }
+  function stop() {
+    cancelAnimationFrame(raf);
+    raf = 0;
+  }
+
+  // タブ非表示時は描画を止めて負荷を下げる
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) stop(); else start();
+  });
+
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 200); });
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
+  window.addEventListener("pageshow", refreshContinue);
+
+  resize();
+  start();
+})();
+</script>
 </body>
 </html>
