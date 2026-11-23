@@ -1,4 +1,5 @@
 import { createGameService } from './game.js';
+
 /**
  * ASTRALIA ― 天環の彼方 ― 起動処理 (src/core/main.js)
  *
