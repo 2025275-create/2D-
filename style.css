@@ -1,22 +1,57 @@
+/* ==========================================================================
+   ASTRALIA ― 天環の彼方 ―  style.css  (title screen)
+   対応要素: #stage #game #ui .screen .title .title__main .title__sub
+            .menu .btn #toast .version #rotate-hint
+   方針: 深い紺 / 銀 / 青白い光 / 控えめな金。装飾は ::before ::after のみで構成。
+         アニメーションは transform と opacity のみ（低性能端末向け）。
+   ========================================================================== */
+
+/* ---------- デザイントークン ---------- */
 :root {
-  --bg: #070b1c;
-  --ring: #e8c872;
-  --mist: #b9d9ea;
+  --navy-950: #03060f;
+  --navy-900: #050914;
+  --navy-800: #0a1230;
+  --navy-700: #101c46;
+  --navy-600: #1a2b66;
+
+  --silver-100: #f2f6fc;
+  --silver-300: #c9d3e3;
+  --silver-500: #8d9ab3;
+
+  --glow: #9fd8ff;
+  --glow-soft: rgba(159, 216, 255, 0.35);
+  --glow-faint: rgba(159, 216, 255, 0.12);
+
+  --gold: #d6b25e;
+  --gold-soft: rgba(214, 178, 94, 0.45);
+  --gold-faint: rgba(214, 178, 94, 0.18);
+
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
-  --font-ui: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", "Times New Roman", serif;
+
+  --font-serif: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", "YuMincho", "Noto Serif JP", "Times New Roman", serif;
+  --font-sans: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+
+  /* 天環の中心（タイトルの重心付近） */
+  --ring-size: min(118vmin, 980px);
+  --ring-inner: min(84vmin, 700px);
+  --center-y: 0.35;
 }
+
+/* ---------- ベース ---------- */
 *, *::before, *::after { box-sizing: border-box; }
+
 html, body {
-  margin: 0; padding: 0;
-  width: 100%; height: 100%;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  background: var(--bg);
-  color: var(--mist);
-  font-family: var(--font-ui);
-  /* ページスクロール・ズーム・バウンス防止 */
+  background: var(--navy-900);
+  color: var(--silver-300);
+  font-family: var(--font-serif);
   overscroll-behavior: none;
   touch-action: none;
   -webkit-touch-callout: none;
@@ -24,19 +59,542 @@ html, body {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
-body { position: fixed; inset: 0; }
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+/* ---------- ステージ ---------- */
 #stage {
-  position: fixed; inset: 0;
-  height: 100vh; height: 100dvh;
-  /* セーフエリア（ノッチ・ホームバー）を避ける */
-  padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 38%, var(--navy-700) 0%, transparent 70%),
+    linear-gradient(180deg, var(--navy-800) 0%, var(--navy-950) 100%);
 }
+
+/* Canvas が描画されない場合の予備：静的な星空（Canvas の下に隠れる） */
+#stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(1px 1px at 12% 18%, rgba(242, 246, 252, 0.9), transparent 100%),
+    radial-gradient(1px 1px at 27% 62%, rgba(159, 216, 255, 0.8), transparent 100%),
+    radial-gradient(1.5px 1.5px at 41% 28%, rgba(242, 246, 252, 0.9), transparent 100%),
+    radial-gradient(1px 1px at 58% 74%, rgba(159, 216, 255, 0.7), transparent 100%),
+    radial-gradient(1.5px 1.5px at 72% 14%, rgba(242, 246, 252, 0.9), transparent 100%),
+    radial-gradient(1px 1px at 86% 48%, rgba(159, 216, 255, 0.8), transparent 100%),
+    radial-gradient(1px 1px at 93% 83%, rgba(242, 246, 252, 0.7), transparent 100%),
+    radial-gradient(1px 1px at 6% 88%, rgba(159, 216, 255, 0.7), transparent 100%);
+  pointer-events: none;
+}
+
+/* 金色の粒子（Canvas の上・UI の下）。2px の点を box-shadow で複製 */
+#stage::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  width: 2px;
+  height: 2px;
+  background: transparent;
+  box-shadow:
+    8vw 96vh 0 0 rgba(214, 178, 94, 0.85),
+    19vw 71vh 0 1px rgba(214, 178, 94, 0.7),
+    33vw 108vh 0 0 rgba(214, 178, 94, 0.8),
+    47vw 84vh 0 0 rgba(214, 178, 94, 0.65),
+    61vw 102vh 0 1px rgba(214, 178, 94, 0.75),
+    74vw 78vh 0 0 rgba(214, 178, 94, 0.85),
+    88vw 99vh 0 0 rgba(214, 178, 94, 0.7),
+    94vw 66vh 0 1px rgba(214, 178, 94, 0.6),
+    26vw 54vh 0 0 rgba(214, 178, 94, 0.6),
+    68vw 58vh 0 0 rgba(214, 178, 94, 0.6);
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: drift 17s linear -6s infinite;
+}
+
+/* Canvas：将来のゲーム本体の描画先 */
 #game {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: block;
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
   touch-action: none;
   outline: none;
 }
-.msg { position: fixed; inset: 0; display: grid; place-items: center; margin: 0; }
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- UI レイヤー ---------- */
+#ui {
+  --cx: calc(var(--safe-l) + (100% - var(--safe-l) - var(--safe-r)) / 2);
+  --cy: calc(var(--safe-t) + (100% - var(--safe-t) - var(--safe-b)) * var(--center-y));
+
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+  pointer-events: none;
+  /* 周辺減光（四隅を暗くして中央の光を際立たせる） */
+  background: radial-gradient(ellipse 120% 100% at 50% 40%, transparent 55%, rgba(3, 6, 15, 0.7) 100%);
+}
+
+/* 外側の天環：目盛り付きの銀の輪がゆっくり回る */
+#ui::before {
+  content: "";
+  position: absolute;
+  left: var(--cx);
+  top: var(--cy);
+  width: var(--ring-size);
+  height: var(--ring-size);
+  margin: calc(var(--ring-size) / -2) 0 0 calc(var(--ring-size) / -2);
+  border-radius: 50%;
+  border: 1px solid rgba(201, 211, 227, 0.4);
+  background: repeating-conic-gradient(from 0deg, rgba(201, 211, 227, 0.55) 0deg 0.5deg, transparent 0.5deg 5deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 0, transparent 95%, #000 95.4%, #000 100%);
+  mask: radial-gradient(closest-side, transparent 0, transparent 95%, #000 95.4%, #000 100%);
+  opacity: 0.55;
+  pointer-events: none;
+  will-change: transform;
+  animation: ring-spin 150s linear infinite;
+}
+
+/* 青白い光の粒子（下から上へ昇る） */
+#ui::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 2px;
+  background: transparent;
+  box-shadow:
+    5vw 92vh 0 0 rgba(159, 216, 255, 0.9),
+    11vw 64vh 0 0 rgba(242, 246, 252, 0.8),
+    16vw 104vh 0 1px rgba(159, 216, 255, 0.7),
+    22vw 80vh 0 0 rgba(242, 246, 252, 0.85),
+    29vw 98vh 0 0 rgba(159, 216, 255, 0.8),
+    36vw 70vh 0 0 rgba(159, 216, 255, 0.7),
+    43vw 106vh 0 1px rgba(242, 246, 252, 0.75),
+    50vw 88vh 0 0 rgba(159, 216, 255, 0.9),
+    56vw 60vh 0 0 rgba(242, 246, 252, 0.7),
+    63vw 94vh 0 0 rgba(159, 216, 255, 0.8),
+    70vw 110vh 0 1px rgba(159, 216, 255, 0.7),
+    77vw 68vh 0 0 rgba(242, 246, 252, 0.85),
+    83vw 90vh 0 0 rgba(159, 216, 255, 0.9),
+    90vw 76vh 0 1px rgba(242, 246, 252, 0.7),
+    96vw 100vh 0 0 rgba(159, 216, 255, 0.8),
+    3vw 48vh 0 0 rgba(159, 216, 255, 0.6),
+    38vw 46vh 0 0 rgba(242, 246, 252, 0.6),
+    66vw 44vh 0 0 rgba(159, 216, 255, 0.6),
+    92vw 52vh 0 0 rgba(242, 246, 252, 0.6);
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: rise 11s linear infinite;
+}
+
+/* ---------- 画面（タイトルなど） ---------- */
+.screen {
+  position: relative;
+  z-index: 1;
+  display: none;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(20px, 6vh, 64px);
+  padding: 2vh 4vw;
+}
+.screen.is-active { display: flex; }
+
+/* 内側の天環：金の破線の輪が逆回転 */
+.screen::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: calc(100% * var(--center-y));
+  width: var(--ring-inner);
+  height: var(--ring-inner);
+  margin: calc(var(--ring-inner) / -2) 0 0 calc(var(--ring-inner) / -2);
+  border-radius: 50%;
+  border: 1px dashed var(--gold-soft);
+  box-shadow: 0 0 0 10px transparent, inset 0 0 40px var(--gold-faint);
+  opacity: 0.8;
+  pointer-events: none;
+  will-change: transform;
+  animation: ring-spin-rev 90s linear infinite;
+}
+
+/* タイトル背後の光暈 */
+.screen::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: calc(100% * var(--center-y));
+  width: calc(var(--ring-inner) * 1.1);
+  height: calc(var(--ring-inner) * 1.1);
+  margin: calc(var(--ring-inner) * -0.55) 0 0 calc(var(--ring-inner) * -0.55);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(159, 216, 255, 0.28) 0%, rgba(60, 100, 200, 0.14) 38%, transparent 68%);
+  pointer-events: none;
+  will-change: opacity;
+  animation: halo 7s ease-in-out infinite;
+}
+
+/* ---------- タイトルロゴ ---------- */
+.title {
+  margin: 0;
+  text-align: center;
+  line-height: 1;
+}
+.screen.is-active .title { animation: reveal 1.4s ease-out both; }
+
+.title__main {
+  display: block;
+  font-weight: 600;
+  font-size: clamp(44px, 13vmin, 136px);
+  letter-spacing: 0.22em;
+  padding-left: 0.22em;
+  background: linear-gradient(180deg, #ffffff 0%, var(--silver-300) 48%, #7f8da8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: drop-shadow(0 0 18px var(--glow-soft)) drop-shadow(0 2px 0 rgba(3, 6, 15, 0.8));
+}
+
+.title__sub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9em;
+  margin-top: clamp(10px, 2.4vh, 26px);
+  font-weight: 400;
+  font-size: clamp(16px, 3.6vmin, 34px);
+  letter-spacing: 0.4em;
+  color: var(--glow);
+  text-shadow: 0 0 14px var(--glow-soft);
+}
+/* 左右の金の装飾線 */
+.title__sub::before,
+.title__sub::after {
+  content: "";
+  flex: none;
+  width: clamp(28px, 9vmin, 96px);
+  height: 1px;
+}
+.title__sub::before {
+  background: linear-gradient(90deg, transparent, var(--gold));
+  box-shadow: 0 0 8px var(--gold-faint);
+}
+.title__sub::after {
+  margin-left: -0.4em; /* 末尾の字間を相殺して左右対称にする */
+  background: linear-gradient(270deg, transparent, var(--gold));
+  box-shadow: 0 0 8px var(--gold-faint);
+}
+
+/* ---------- メニュー ---------- */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 2.4vh, 22px);
+  width: min(78vw, 360px);
+  pointer-events: auto;
+}
+
+/* ---------- ボタン（ピクセルアート調の欠け角枠） ---------- */
+.btn {
+  --bc: var(--silver-500);
+
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 0.7em 1em;
+  font-family: var(--font-sans);
+  font-size: clamp(16px, 2.8vmin, 22px);
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-indent: 0.28em;
+  text-align: center;
+  color: var(--silver-100);
+  background: linear-gradient(180deg, rgba(159, 216, 255, 0.12) 0%, rgba(16, 28, 70, 0.72) 100%);
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  /* 上下左右3pxの帯で角の欠けたドット枠を表現 */
+  box-shadow:
+    -3px 0 0 0 var(--bc),
+    3px 0 0 0 var(--bc),
+    0 -3px 0 0 var(--bc),
+    0 3px 0 0 var(--bc),
+    inset 0 2px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -3px 0 rgba(3, 6, 15, 0.45),
+    inset 0 0 18px var(--glow-faint);
+  transition: transform 0.12s ease-out, box-shadow 0.18s ease-out, color 0.18s ease-out;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  will-change: transform;
+}
+.screen.is-active .menu .btn { animation: reveal 0.7s ease-out both; }
+.screen.is-active .menu .btn:nth-child(1) { animation-delay: 0.55s; }
+.screen.is-active .menu .btn:nth-child(2) { animation-delay: 0.7s; }
+.screen.is-active .menu .btn:nth-child(3) { animation-delay: 0.85s; }
+
+/* 選択マーカー（金の菱形）：左右に表示 */
+.btn::before,
+.btn::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  background: var(--gold);
+  box-shadow: 0 0 8px var(--gold-soft);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.18s ease-out, opacity 0.18s ease-out;
+}
+.btn::before { left: 16px;  transform: translateX(8px) rotate(45deg) scale(0.4); }
+.btn::after  { right: 16px; transform: translateX(-8px) rotate(45deg) scale(0.4); }
+
+/* フォーカス（キーボード・外部コントローラ） */
+.btn:focus-visible {
+  --bc: var(--glow);
+  outline: 2px solid var(--gold-soft);
+  outline-offset: 7px;
+  color: #ffffff;
+  box-shadow:
+    -3px 0 0 0 var(--bc),
+    3px 0 0 0 var(--bc),
+    0 -3px 0 0 var(--bc),
+    0 3px 0 0 var(--bc),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -3px 0 rgba(3, 6, 15, 0.4),
+    inset 0 0 26px var(--glow-soft),
+    0 0 26px var(--glow-faint);
+}
+.btn:focus-visible::before { opacity: 1; transform: translateX(0) rotate(45deg) scale(1); }
+.btn:focus-visible::after  { opacity: 1; transform: translateX(0) rotate(45deg) scale(1); }
+
+/* ホバー（マウス・トラックパッドのある端末のみ） */
+@media (hover: hover) {
+  .btn:hover {
+    --bc: var(--glow);
+    color: #ffffff;
+    box-shadow:
+      -3px 0 0 0 var(--bc),
+      3px 0 0 0 var(--bc),
+      0 -3px 0 0 var(--bc),
+      0 3px 0 0 var(--bc),
+      inset 0 2px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -3px 0 rgba(3, 6, 15, 0.4),
+      inset 0 0 26px var(--glow-soft),
+      0 0 26px var(--glow-faint);
+  }
+  .btn:hover::before { opacity: 1; transform: translateX(0) rotate(45deg) scale(1); }
+  .btn:hover::after  { opacity: 1; transform: translateX(0) rotate(45deg) scale(1); }
+}
+
+/* 押下：沈み込み＋白く発光（タッチ端末でも有効） */
+.btn:active {
+  --bc: #ffffff;
+  transform: translateY(2px) scale(0.985);
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(159, 216, 255, 0.34) 0%, rgba(26, 43, 102, 0.8) 100%);
+  box-shadow:
+    -3px 0 0 0 var(--bc),
+    3px 0 0 0 var(--bc),
+    0 -3px 0 0 var(--bc),
+    0 3px 0 0 var(--bc),
+    inset 0 3px 0 rgba(3, 6, 15, 0.4),
+    inset 0 0 30px var(--glow-soft),
+    0 0 34px var(--glow-soft);
+  transition-duration: 0.04s;
+}
+.btn:active::before,
+.btn:active::after { opacity: 1; transform: translateX(0) rotate(45deg) scale(1.15); }
+
+/* 無効（CONTINUE：セーブデータなし） */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  --bc: rgba(141, 154, 179, 0.3);
+  color: var(--silver-500);
+  background: rgba(10, 18, 48, 0.4);
+  box-shadow:
+    -3px 0 0 0 var(--bc),
+    3px 0 0 0 var(--bc),
+    0 -3px 0 0 var(--bc),
+    0 3px 0 0 var(--bc);
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+.btn:disabled::before, .btn:disabled::after,
+.btn[aria-disabled="true"]::before, .btn[aria-disabled="true"]::after { opacity: 0; }
+
+/* ---------- トースト（仮実装メッセージ） ---------- */
+#toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-b) + 6vh);
+  z-index: 5;
+  max-width: 86vw;
+  padding: 0.75em 1.8em;
+  font-family: var(--font-sans);
+  font-size: clamp(14px, 2.4vmin, 18px);
+  letter-spacing: 0.12em;
+  text-align: center;
+  color: var(--silver-100);
+  background: rgba(5, 9, 20, 0.9);
+  box-shadow:
+    -2px 0 0 0 var(--gold-soft),
+    2px 0 0 0 var(--gold-soft),
+    0 -2px 0 0 var(--gold-soft),
+    0 2px 0 0 var(--gold-soft),
+    0 0 24px var(--glow-faint);
+  opacity: 0;
+  transform: translate(-50%, 12px);
+  pointer-events: none;
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+}
+#toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- バージョン表記 ---------- */
+.version {
+  position: absolute;
+  right: calc(var(--safe-r) + 14px);
+  bottom: calc(var(--safe-b) + 8px);
+  z-index: 3;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--silver-500);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* ---------- 縦画面ガイド ---------- */
+#rotate-hint {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: calc(var(--safe-t) + 24px) calc(var(--safe-r) + 24px) calc(var(--safe-b) + 24px) calc(var(--safe-l) + 24px);
+  text-align: center;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 45%, rgba(26, 43, 102, 0.6), transparent 70%),
+    rgba(3, 6, 15, 0.95);
+  color: var(--silver-100);
+  font-size: clamp(18px, 4.4vw, 26px);
+  letter-spacing: 0.14em;
+  line-height: 1.8;
+}
+#rotate-hint small {
+  font-family: var(--font-sans);
+  font-size: 0.6em;
+  letter-spacing: 0.1em;
+  color: var(--silver-500);
+}
+@media (orientation: portrait) {
+  #rotate-hint { display: flex; }
+}
+
+/* ---------- レスポンシブ ---------- */
+
+/* iPad Pro 12.9 など大型の横画面 */
+@media (min-width: 1100px) and (min-height: 700px) {
+  .menu { width: 400px; }
+  .btn { min-height: 62px; font-size: 22px; }
+}
+
+/* 低い画面（スマートフォン横向き）：メニューを横並びにして収める */
+@media (max-height: 430px) {
+  :root {
+    --ring-size: min(150vmin, 760px);
+    --ring-inner: min(110vmin, 560px);
+    --center-y: 0.38;
+  }
+  .screen { gap: 16px; padding: 1vh 3vw; }
+  .menu { flex-direction: row; gap: 18px; width: min(92vw, 720px); }
+  .btn {
+    min-height: 48px;
+    padding: 0.6em 0.4em;
+    font-size: 15px;
+    letter-spacing: 0.16em;
+    text-indent: 0.16em;
+  }
+  .btn::before { left: 8px; }
+  .btn::after { right: 8px; }
+  .title__main { font-size: clamp(40px, 15vmin, 72px); }
+  .version { display: none; }
+}
+
+/* 狭い横幅 */
+@media (max-width: 560px) {
+  .menu { width: min(86vw, 340px); }
+}
+
+/* ---------- アニメーション定義（transform / opacity のみ） ---------- */
+@keyframes ring-spin     { to { transform: rotate(360deg); } }
+@keyframes ring-spin-rev { to { transform: rotate(-360deg); } }
+
+@keyframes halo {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+@keyframes rise {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0); }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(0, -16vh, 0); }
+}
+
+@keyframes drift {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0); }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(2vw, -22vh, 0); }
+}
+
+@keyframes reveal {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* ---------- 視覚効果を減らす設定 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  #ui::before { opacity: 0.45; }
+  .screen::after { opacity: 0.8; }
+  .btn:active { transform: none; }
+}
