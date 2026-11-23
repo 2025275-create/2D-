@@ -1,0 +1,85 @@
+diff --git a/index.html b/index.html
+index ea2eb88..c38445d 100644
+--- a/index.html
++++ b/index.html
+@@ -414,6 +414,7 @@ body {
+   var time = 0;
+   var last = 0;
+   var raf = 0;
++  var suspended = false; // true の間は背景描画を行わない（ゲーム本体が Canvas を使用中）
+   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+ 
+   function makeStars() {
+@@ -431,6 +432,7 @@ body {
+   }
+ 
+   function resize() {
++    if (suspended) return;
+     var rect = canvas.getBoundingClientRect();
+     dpr = Math.min(window.devicePixelRatio || 1, 2);
+     W = Math.max(1, Math.round(rect.width));
+@@ -458,6 +460,7 @@ body {
+   }
+ 
+   function draw() {
++    if (suspended) return;
+     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+ 
+     var bg = ctx.createLinearGradient(0, 0, 0, H);
+@@ -516,6 +519,7 @@ body {
+ 
+   // タブ非表示時は描画を止めて負荷を下げる
+   document.addEventListener("visibilitychange", function () {
++    if (suspended) return;
+     if (document.hidden) stop(); else start();
+   });
+ 
+@@ -524,9 +528,27 @@ body {
+   if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
+   window.addEventListener("pageshow", refreshContinue);
+ 
++  /* ---------- ゲーム本体からの背景描画の停止・再開 ----------
++     Astralia.background.stop()  … 背景描画を止め、Canvas に触れない状態にする
++     Astralia.background.start() … 背景描画を再開する（サイズを再計算して描き直す） */
++  Astralia.background = {
++    stop: function () {
++      suspended = true;
++      stop();
++    },
++    start: function () {
++      suspended = false;
++      resize();
++      if (!document.hidden) start();
++    }
++  };
++
+   resize();
+   start();
+ })();
+ </script>
++
++<!-- ゲーム本体（ES Modules）。上のインラインスクリプトが window.Astralia を作成した後に読み込む -->
++<script type="module" src="./src/core/main.js"></script>
+ </body>
+ </html>
+diff --git a/src/core/main.js b/src/core/main.js
+index 325c4de..cc44f66 100644
+--- a/src/core/main.js
++++ b/src/core/main.js
+@@ -19,6 +19,8 @@
+  *   window.Astralia  … index.html 内蔵の簡易ブリッジ（存在する場合は連携し、二重処理しない）
+  */
+ 
++import { createGameService } from './game.js';
++
+ /* ==========================================================================
+    定数
+    ========================================================================== */
+@@ -600,6 +602,7 @@ async function boot() {
+   globalThis[BOOT_FLAG] = true;
+ 
+   const app = new GameApp();
++  app.registerService('game', createGameService());
+   try {
+     await whenDomReady();
+     await app.start();
