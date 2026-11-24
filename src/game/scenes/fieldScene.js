@@ -45,6 +45,7 @@ export class FieldScene {
     this.insets = { top: 0, right: 0, bottom: 0, left: 0 };
     this.disposers = [];
     this.leaving = false;
+    this.onActionPress = null; // 右半分のタッチ用フック（攻撃・スキル。未接続）
 
     // プレイヤーを Y ソートの対象にするための描画ハンドル
     const self = this;
@@ -195,9 +196,17 @@ export class FieldScene {
     return this.game.changeScene(this.titleScene);
   }
 
-  onPointerDown({ x, y }) {
+  /**
+   * Canvas へ届くタッチ＝画面の右半分（左半分は移動ジョイスティックの領域が受ける）。
+   * 戻るボタン以外は、攻撃・スキルなどの操作用フックへ渡す。
+   * 将来: scene.onActionPress = ({ x, y, pointerId }) => { ... } に攻撃処理を接続する。
+   */
+  onPointerDown({ x, y, event }) {
     const b = this.backRect(this.game.viewport.width);
-    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) this.goTitle();
+    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { this.goTitle(); return; }
+    if (typeof this.onActionPress === 'function') {
+      this.onActionPress({ x, y, pointerId: event ? event.pointerId : null });
+    }
   }
 
   onKeyDown(event) {
