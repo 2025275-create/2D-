@@ -1,4 +1,3 @@
-
 /**
  * フィールドシーン (src/game/scenes/fieldScene.js)
  *
@@ -102,6 +101,9 @@ export class FieldScene {
     this.input = new InputManager({ host });
     this.combat = new CombatInput();
     this.combat.on('*', (event) => {
+      // Player の攻撃・回避へ接続（先に処理し、その後で従来どおり onActionPress へ転送する）
+      this.routeCombatEvent(event);
+
       if (typeof this.onActionPress === 'function') {
         this.onActionPress(event);
       }
@@ -310,6 +312,31 @@ export class FieldScene {
 
     if (this.combatUi) {
       this.combatUi.renderLabels();
+    }
+  }
+
+  /**
+   * CombatInput のイベントを Player の攻撃・回避処理へ渡す。
+   *   attack: { type: 'attack', combo, comboMax, continued }  -> player.startAttack(event)
+   *   dodge : { type: 'dodge', invulnerableSeconds, canceledCombo } -> player.startDodge(event)
+   * スキル・ポインター等のイベントは何もしない（onActionPress への転送だけ）。
+   * Player 側のメソッドが無い間は何も呼ばない（例外にしない）。
+   */
+  routeCombatEvent(event) {
+    if (!event || typeof event !== 'object') return;
+
+    const player = this.player;
+    if (!player) return;
+
+    try {
+      if (event.type === 'attack' && typeof player.startAttack === 'function') {
+        player.startAttack(event);
+      } else if (event.type === 'dodge' && typeof player.startDodge === 'function') {
+        player.startDodge(event);
+      }
+    } catch (error) {
+      // Player 側の例外で、onActionPress への転送や他の入力を止めない
+      console.error('[ASTRALIA:field] 戦闘イベントの処理でエラー:', error);
     }
   }
 
