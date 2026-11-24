@@ -10,9 +10,10 @@
  *
  * 現在の実装状況:
  *   実装済み : 起動・停止・破棄、Canvas管理、リサイズ/回転対応、固定ステップのループ、
- *              シーン管理、タイトル/プレイ(仮)/設定(仮)シーン、エラー保護
- *   未実装   : マップ、戦闘、キャラクター、敵、クエスト、セーブ読込、設定項目、音声
- *              （プレイ画面・設定画面は「仮表示」であり、ゲームとしては未完成です）
+ *              シーン管理、タイトル、プレイ（基本フィールド: src/game/scenes/fieldScene.js）、
+ *              設定(仮)シーン、エラー保護
+ *   未実装   : 戦闘、敵、NPC、クエスト、セーブ読込、設定項目、音声
+ *              （設定画面は「仮表示」であり、ゲームとしては未完成です）
  *
  * 他ファイルとの前提（index.html / style.css / main.js）:
  *   #stage, #game(canvas), #ui, .screen#screen-title を参照。見つからなくても停止しない。
@@ -24,6 +25,8 @@
  *     resize(viewport), onPointerDown({x,y,event}), onKeyDown(event), dispose() }
  *   ownsCanvas が true のシーンだけが Canvas に描画する（座標は論理ピクセル）。
  */
+
+import { FieldScene } from '../game/scenes/fieldScene.js';
 
 /* ==========================================================================
    定数
@@ -761,7 +764,7 @@ export class Game {
 
   /* ---------- タイトルメニューからの操作 ---------- */
 
-  /** NEW GAME：プレイシーンへ。現時点のプレイシーンは仮表示（ゲーム本体は未実装）。 */
+  /** NEW GAME：プレイシーン（星環都市アステリアの基本フィールド）へ。 */
   async startNewGame() {
     this.events.emit('game:new-requested');
     this.state.patch({ floor: 1 });
@@ -939,14 +942,10 @@ class PlaceholderScene {
   }
 }
 
-/** 標準シーン（タイトル / プレイ[仮] / 設定[仮]）を登録する。 */
+/** 標準シーン（タイトル / プレイ[基本フィールド] / 設定[仮]）を登録する。 */
 export function registerDefaultScenes(game) {
   game.registerScene(SCENE.TITLE, (g) => new TitleScene(g));
-  game.registerScene(SCENE.PLAY, (g) => new PlaceholderScene(g, {
-    heading: 'GAMEPLAY（仮表示）',
-    lines: ['マップ・戦闘・キャラクターは未実装です', 'Esc またはボタンでタイトルへ戻れます'],
-    grid: true,
-  }));
+  game.registerScene(SCENE.PLAY, (g) => new FieldScene(g, { tileSize: TILE_SIZE, titleScene: SCENE.TITLE }));
   game.registerScene(SCENE.SETTINGS, (g) => new PlaceholderScene(g, {
     heading: 'SETTINGS（仮表示）',
     lines: ['設定項目は未実装です'],
