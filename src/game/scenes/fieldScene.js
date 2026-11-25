@@ -99,7 +99,12 @@ export class FieldScene {
 
     const host = game.stage || document.body;
     this.input = new InputManager({ host });
-    this.combat = new CombatInput();
+    // 回避中かどうかの判定元は Player。回避中の攻撃・回避入力は CombatInput 側で受け付けない
+    // （コンボ番号を進めず、イベントも出さない）。
+    this.combat = new CombatInput({
+      canAttack: () => !this.player || !this.player.dodging,
+      canDodge: () => !this.player || !this.player.dodging,
+    });
     this.combat.on('*', (event) => {
       // Player の攻撃・回避へ接続（先に処理し、その後で従来どおり onActionPress へ転送する）
       this.routeCombatEvent(event);
