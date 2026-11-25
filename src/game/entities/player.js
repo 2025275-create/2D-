@@ -60,7 +60,8 @@ export class Player {
 
     // 通常攻撃
     this.combo = 0;         // 現在のコンボ番号（0 = コンボ中ではない）。CombatInput の値を保持する
-    this.comboTimer = 0;    // コンボ受付の残り秒
+    this.comboTimer = 0;    // コンボ受付の残り秒（表示・参照用。失効の判定は comboElapsed）
+    this.comboElapsed = 0;  // 最後の攻撃入力からの経過秒。CombatInput と同じ加算で数え、失効のタイミングを一致させる
     this.attackTimer = 0;   // 攻撃状態の残り秒（0 = 攻撃していない）
 
     // 回避
@@ -102,6 +103,7 @@ export class Player {
 
     this.combo = combo;                              // 番号は CombatInput の値を使う
     this.comboTimer = PLAYER_COMBAT.comboWindow;
+    this.comboElapsed = 0;
     this.attackTimer = PLAYER_COMBAT.attackDuration;
     this.state = 'attack';
     return true;
@@ -121,6 +123,7 @@ export class Player {
     this.attackTimer = 0;
     this.combo = 0;
     this.comboTimer = 0;
+    this.comboElapsed = 0;
 
     const inv = Number.isFinite(event.invulnerableSeconds) && event.invulnerableSeconds > 0
       ? event.invulnerableSeconds
@@ -172,9 +175,15 @@ export class Player {
     this.invulnerableTimer = settle(this.invulnerableTimer - dt);
     this.attackTimer = settle(this.attackTimer - dt);
     if (this.combo > 0) {
-      this.comboTimer -= dt;
-      // 受付時間（1.2 秒）を「超えたら」コンボ番号を捨てる（CombatInput と同じ境界）
-      if (this.comboTimer < -EPS) { this.combo = 0; this.comboTimer = 0; }
+      // 受付時間（1.2 秒）を「超えたら」コンボ番号を捨てる。CombatInput（sinceAttack += dt、> 1.2）と
+      // 同じ加算・同じ比較にして、浮動小数点の誤差でも 1 フレームもずれないようにする。
+      this.comboElapsed += dt;
+      this.comboTimer = Math.max(0, PLAYER_COMBAT.comboWindow - this.comboElapsed);
+      if (this.comboElapsed > PLAYER_COMBAT.comboWindow) {
+        this.combo = 0;
+        this.comboElapsed = 0;
+        this.comboTimer = 0;
+      }
     }
 
     const moved = Math.hypot(b.x - px, b.y - py);
