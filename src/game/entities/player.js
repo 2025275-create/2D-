@@ -1,9 +1,18 @@
 /**
  * プレイヤー (src/game/entities/player.js)
  *
- * 位置・向き・移動状態・ステータスを管理する。見た目は playerSprite.js に分離しており、
- * スプライト画像や 4 方向アニメーションへ差し替えるときは Player を変更しない。
- * 将来の攻撃・回避・スキルは state / update に追加する。
+ * 位置・向き・移動状態・ステータスに加えて、通常攻撃（5 段コンボ）と回避（無敵時間つき）の
+ * 状態を管理する。見た目は playerSprite.js に分離している。
+ *
+ * 戦闘の入力は FieldScene が CombatInput のイベントを渡す:
+ *   attack: { type, combo, comboMax, continued } -> startAttack(event)
+ *   dodge : { type, invulnerableSeconds, canceledCombo } -> startDodge(event)
+ *
+ * 状態（state）の優先順位: dodge > attack > walk > idle
+ *   コンボ番号（combo）と攻撃状態（attackTimer）は別々に持つ。コンボ番号は CombatInput から受け取った
+ *   値をそのまま使い、Player 側では数え上げない（二重カウントしない）。comboTimer は
+ *   「受け取った番号をいつ捨てるか」だけを持つ。
+ * ダメージ・当たり判定（攻撃範囲）・敵への処理は未実装。
  */
 
 import { DIRECTIONS_8 } from '../input/inputManager.js';
@@ -14,6 +23,19 @@ export const PLAYER_DEFAULTS = Object.freeze({
   hw: 8,      // 当たり判定の半幅
   hh: 8,      // 当たり判定の高さ（足元から）
 });
+
+/** 戦闘の数値（秒 / 倍率） */
+export const PLAYER_COMBAT = Object.freeze({
+  comboMax: 5,               // 最大コンボ段数
+  comboWindow: 1.2,          // コンボ受付時間（最後の攻撃入力から）
+  attackDuration: 0.36,      // 1 段あたりの攻撃時間
+  dodgeDuration: 0.45,       // 回避時間
+  dodgeInvulnerable: 0.3,    // 回避開始からの無敵時間
+  dodgeSpeedMultiplier: 2.8, // 回避速度 = 通常移動速度 × 2.8
+});
+
+const EPS = 1e-9;
+const settle = (t) => (t < EPS ? 0 : t); // 浮動小数点の誤差で「0.0000…1 秒残る」のを防ぐ
 
 export class Player {
   constructor({ x, y, speed = PLAYER_DEFAULTS.speed } = {}) {
@@ -33,8 +55,19 @@ export class Player {
     this.dirY = 1;
 
     this.moving = false;    // 実際に動いたか（壁に押し付けているだけなら false）
-    this.state = 'idle';    // 'idle' | 'walk'（将来 'attack' / 'dodge' などを追加）
-    this.walkTime = 0;      // 歩いた距離（px）。歩行アニメーションの位相に使う
+    this.state = 'idle';    // 'dodge' > 'attack' > 'walk' > 'idle'
+    this.walkTime = 0;      // 動いた距離（px）。歩行アニメーションの位相に使う
+
+    // 通常攻撃
+    this.combo = 0;         // 現在のコンボ番号（0 = コンボ中ではない）。CombatInput の値を保持する
+    this.comboTimer = 0;    // コンボ受付の残り秒
+    this.attackTimer = 0;   // 攻撃状態の残り秒（0 = 攻撃していない）
+
+    // 回避
+    this.dodgeTimer = 0;       // 回避状態の残り秒（0 = 回避していない）
+    this.invulnerableTimer = 0; // 無敵の残り秒
+    this.dodgeDirX = 0;        // 回避方向（開始時点の向き。回避中は変わらない）
+    this.dodgeDirY = 0;
   }
 
   get x() { return this.body.x; }
@@ -43,10 +76,64 @@ export class Player {
   /** 描画順（Y ソート）用 */
   get sortY() { return this.body.y; }
 
+  get attacking() { return this.attackTimer > 0; }
+  get dodging() { return this.dodgeTimer > 0; }
+  /** 無敵中か（ダメージ処理側が参照する） */
+  get invulnerable() { return this.invulnerableTimer > 0; }
+
   setPosition(x, y) {
     this.body.x = x;
     this.body.y = y;
   }
+
+  /* ---------- 戦闘 ---------- */
+
+  /**
+   * 通常攻撃を開始する。
+   * @param {{type?: string, combo: number}} event CombatInput の attack イベント
+   * @returns {boolean} 受け付けたか（不正なイベント・回避中は false）
+   */
+  startAttack(event) {
+    if (!event || typeof event !== 'object') return false;
+    if (event.type !== undefined && event.type !== 'attack') return false;
+    const { combo } = event;
+    if (!Number.isInteger(combo) || combo < 1 || combo > PLAYER_COMBAT.comboMax) return false;
+    if (this.dodging) return false; // 回避が優先。回避中の攻撃入力は受け付けない
+
+    this.combo = combo;                              // 番号は CombatInput の値を使う
+    this.comboTimer = PLAYER_COMBAT.comboWindow;
+    this.attackTimer = PLAYER_COMBAT.attackDuration;
+    this.state = 'attack';
+    return true;
+  }
+
+  /**
+   * 回避を開始する。攻撃状態とコンボを解除し、開始時点の向きへ移動する。
+   * @param {{type?: string, invulnerableSeconds?: number}} event CombatInput の dodge イベント
+   * @returns {boolean} 受け付けたか（不正なイベント・回避中は false）
+   */
+  startDodge(event) {
+    if (!event || typeof event !== 'object') return false;
+    if (event.type !== undefined && event.type !== 'dodge') return false;
+    if (this.dodging) return false; // 回避の連続入力で回避が延長されない
+
+    // 攻撃とコンボを解除
+    this.attackTimer = 0;
+    this.combo = 0;
+    this.comboTimer = 0;
+
+    const inv = Number.isFinite(event.invulnerableSeconds) && event.invulnerableSeconds > 0
+      ? event.invulnerableSeconds
+      : PLAYER_COMBAT.dodgeInvulnerable;
+    this.dodgeTimer = PLAYER_COMBAT.dodgeDuration;
+    this.invulnerableTimer = Math.min(inv, PLAYER_COMBAT.dodgeDuration);
+    this.dodgeDirX = this.dirX;
+    this.dodgeDirY = this.dirY;
+    this.state = 'dodge';
+    return true;
+  }
+
+  /* ---------- 更新 ---------- */
 
   /**
    * @param {number} dt 秒
@@ -60,19 +147,43 @@ export class Player {
     const px = b.x;
     const py = b.y;
 
-    if (move.dir >= 0) {
+    // 回避：開始時点の向きへ通常の 2.8 倍の速度。同じ CollisionGrid・マップ境界で判定する。
+    // 回避が途中のフレームで終わる場合、残りの時間は通常移動に使う。
+    const dodgeTime = this.dodgeTimer > 0 ? Math.min(dt, this.dodgeTimer) : 0;
+    if (dodgeTime > 0) {
+      const dist = this.speed * PLAYER_COMBAT.dodgeSpeedMultiplier * dodgeTime;
+      moveBody(collision, b, this.dodgeDirX * dist, this.dodgeDirY * dist, mapW, mapH);
+    }
+    const walkTime = dt - dodgeTime;
+
+    // 通常移動（従来どおり）
+    if (walkTime > EPS && move.dir >= 0) {
       const d = DIRECTIONS_8[move.dir];
       this.facing8 = move.dir;
       this.dirX = d.x;
       this.dirY = d.y;
       this.facing = Math.abs(d.y) > Math.abs(d.x) ? (d.y > 0 ? 'down' : 'up') : (d.x > 0 ? 'right' : 'left');
-      const dist = this.speed * dt;
+      const dist = this.speed * walkTime;
       moveBody(collision, b, d.x * dist, d.y * dist, mapW, mapH);
+    }
+
+    // タイマーを進める
+    this.dodgeTimer = settle(this.dodgeTimer - dt);
+    this.invulnerableTimer = settle(this.invulnerableTimer - dt);
+    this.attackTimer = settle(this.attackTimer - dt);
+    if (this.combo > 0) {
+      this.comboTimer -= dt;
+      // 受付時間（1.2 秒）を「超えたら」コンボ番号を捨てる（CombatInput と同じ境界）
+      if (this.comboTimer < -EPS) { this.combo = 0; this.comboTimer = 0; }
     }
 
     const moved = Math.hypot(b.x - px, b.y - py);
     this.moving = moved > 0.01;
-    this.state = this.moving ? 'walk' : 'idle';
     if (this.moving) this.walkTime += moved;
+
+    // 状態：dodge > attack > walk > idle
+    if (this.dodgeTimer > 0) this.state = 'dodge';
+    else if (this.attackTimer > 0) this.state = 'attack';
+    else this.state = this.moving ? 'walk' : 'idle';
   }
 }
