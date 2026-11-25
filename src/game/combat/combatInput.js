@@ -6,6 +6,11 @@
  * スキル効果は一切持たない（未実装）。戦闘システムは、ここのイベントを購読して接続する。
  * 時間は update(dt) で進める（既存のゲームループ。タブ非表示中は進まない）。
  *
+ * コンボ番号の管理元はここ（Player は受け取った番号を保持するだけ）。回避中など、Player が
+ * 受け付けない状態の入力でコンボが進まないよう、入力の瞬間に canAttack() / canDodge() で
+ * 受け付けてよいかを問い合わせる（回避中かどうかの判定元は Player 1 か所）。受け付けない入力は
+ * コンボも進めず、イベントも発行しない。
+ *
  * 発行するイベント（すべて { type, ... } 形式。on('*', fn) で全部受けられる）:
  *   attack            { combo: 1〜5, comboMax, continued: boolean }
  *   dodge             { invulnerableSeconds: 0.3, canceledCombo: boolean }
@@ -32,10 +37,14 @@ export class CombatInput {
   /**
    * @param {object} [options]
    * @param {number} [options.pageCount=2] スキルページ数（枠だけを管理。中身は setSkillPages で渡す）
+   * @param {() => boolean} [options.canAttack] 今、通常攻撃の入力を受け付けてよいか（未指定なら常に true）
+   * @param {() => boolean} [options.canDodge] 今、回避の入力を受け付けてよいか（未指定なら常に true）
    */
-  constructor({ pageCount = 2 } = {}) {
+  constructor({ pageCount = 2, canAttack = null, canDodge = null } = {}) {
     this.listeners = new Map();
     this.time = 0;
+    this.canAttack = typeof canAttack === 'function' ? canAttack : null;
+    this.canDodge = typeof canDodge === 'function' ? canDodge : null;
 
     // 通常攻撃
     this.combo = 0;
@@ -114,11 +123,23 @@ export class CombatInput {
 
   /* ---------- 通常攻撃 ---------- */
 
+  /** 問い合わせ関数を安全に呼ぶ（例外のときは受け付ける側に倒す）。 */
+  allowed(gate) {
+    if (!gate) return true;
+    try { return gate() !== false; } catch (error) {
+      console.error('[ASTRALIA:combat] 入力可否の判定でエラー:', error);
+      return true;
+    }
+  }
+
+  /** @returns {boolean} 受け付けたか（回避中などは false。コンボは進めず、イベントも出さない） */
   pressAttack() {
+    if (!this.allowed(this.canAttack)) return false;
     const continued = this.combo > 0 && this.sinceAttack <= COMBO_WINDOW_SEC;
     this.combo = continued ? (this.combo >= COMBO_MAX ? 1 : this.combo + 1) : 1; // 5 段の次は 1 段目から
     this.sinceAttack = 0;
     this.emit('attack', { combo: this.combo, comboMax: COMBO_MAX, continued });
+    return true;
   }
 
   resetCombo(reason) {
@@ -130,10 +151,13 @@ export class CombatInput {
 
   /* ---------- 回避 ---------- */
 
+  /** @returns {boolean} 受け付けたか（回避中の連打などは false。イベントも出さない） */
   pressDodge() {
+    if (!this.allowed(this.canDodge)) return false;
     const canceledCombo = this.combo > 0;
     if (canceledCombo) this.resetCombo('dodge'); // 回避で通常攻撃コンボをキャンセル
     this.emit('dodge', { invulnerableSeconds: DODGE_INVULNERABLE_SEC, canceledCombo });
+    return true;
   }
 
   /* ---------- スキル ---------- */
