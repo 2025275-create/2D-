@@ -140,7 +140,9 @@ export class Player {
 
   /**
    * @param {number} dt 秒
-   * @param {{dir:number}} move InputManager.getMove の結果
+   * @param {{dir:number, x?:number, y?:number, speed?:number}} move InputManager.getMove の結果。
+   *   x, y（単位ベクトル）と speed（0〜1）があれば、その 360 度の方向・強度で動く。
+   *   dir（8 方向）は向き・スプライト用。x, y が無い呼び出し（従来の { dir } だけ）は dir の方向へ速度 1 で動く。
    * @param {import('../world/collision.js').CollisionGrid} collision
    * @param {number} mapW
    * @param {number} mapH
@@ -159,15 +161,23 @@ export class Player {
     }
     const walkTime = dt - dodgeTime;
 
-    // 通常移動（従来どおり）
+    // 通常移動：入力の 360 度の方向へ、倒し具合（speed）に応じた速度で動く。
+    // 8 方向（dir）は表示用の向きにだけ使い、移動ベクトルは丸めない。
     if (walkTime > EPS && move.dir >= 0) {
       const d = DIRECTIONS_8[move.dir];
       this.facing8 = move.dir;
-      this.dirX = d.x;
-      this.dirY = d.y;
       this.facing = Math.abs(d.y) > Math.abs(d.x) ? (d.y > 0 ? 'down' : 'up') : (d.x > 0 ? 'right' : 'left');
-      const dist = this.speed * walkTime;
-      moveBody(collision, b, d.x * dist, d.y * dist, mapW, mapH);
+
+      let ux = d.x;
+      let uy = d.y;
+      const len = Math.hypot(move.x, move.y); // x, y が無ければ NaN（従来の { dir } 呼び出しは dir の方向へ）
+      if (len > 1e-6) { ux = move.x / len; uy = move.y / len; }
+      const k = Number.isFinite(move.speed) ? Math.max(0, Math.min(1, move.speed)) : 1;
+      this.dirX = ux; // 最後に動いた方向（連続値）。回避はこの方向へ進む
+      this.dirY = uy;
+
+      const dist = this.speed * walkTime * k;
+      if (dist > 0) moveBody(collision, b, ux * dist, uy * dist, mapW, mapH);
     }
 
     // タイマーを進める
